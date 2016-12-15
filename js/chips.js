@@ -4,6 +4,7 @@
     data: [],
     placeholder: '',
     secondaryPlaceholder: '',
+    reversed: false,
   };
 
   $(document).ready(function() {
@@ -50,6 +51,7 @@
         $chips.data('chips', curr_options.data);
         $chips.attr('data-index', i);
         $chips.attr('data-initialized', true);
+        $chips.attr('data-reversed', curr_options.reversed);
 
         if (!$chips.hasClass(self.SELS.CHIPS)) {
           $chips.addClass('chips');
@@ -179,11 +181,21 @@
     };
 
     this.chips = function($chips, chipId) {
+      rev = $chips.attr('data-reversed') === "true";
+
+      var chips;
       var html = '';
-      $chips.data('chips').forEach(function(elem){
+      if (rev) {
+        html += '<input id="' + chipId +'" class="input" placeholder="">';
+        chips = $chips.data('chips').reverse();
+      } else
+        chips = $chips.data('chips');
+
+      chips.forEach(function(elem){
         html += self.renderChip(elem);
       });
-      html += '<input id="' + chipId +'" class="input" placeholder="">';
+      if (!rev)
+        html += '<input id="' + chipId +'" class="input" placeholder="">';
       $chips.html(html);
       self.setPlaceholder($chips);
 
@@ -232,6 +244,8 @@
     };
 
     this.addChip = function(elem, $chips) {
+      rev = $chips.attr('data-reversed') === "true";
+
       if (!self.isValid($chips, elem)) {
         return;
       }
@@ -244,14 +258,23 @@
       newData.push(elem);
 
       $chips.data('chips', newData);
-      $(chipHtml).insertBefore($chips.find('input'));
+      if (rev)
+        $(chipHtml).insertAfter($chips.find('input'));
+      else
+        $(chipHtml).insertBefore($chips.find('input'));
       $chips.trigger('chip.add', elem);
       self.setPlaceholder($chips);
     };
 
     this.deleteChip = function(chipIndex, $chips) {
+      rev = $chips.attr('data-reversed') === "true";
+
+      if (rev) {
+        absIndex = chipIndex - 1;
+        chipIndex = $chips.data('chips').length - chipIndex;
+      }
       var chip = $chips.data('chips')[chipIndex];
-      $chips.find('.chip').eq(chipIndex).remove();
+      $chips.find('.chip').eq(rev ? absIndex : chipIndex).remove();
 
       var newData = [];
       var oldData = $chips.data('chips');
