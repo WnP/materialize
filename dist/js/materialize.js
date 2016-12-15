@@ -1,5 +1,5 @@
 /*!
- * Materialize v0.97.8 (http://materializecss.com)
+ * Materialize vundefined (http://materializecss.com)
  * Copyright 2014-2015 Materialize
  * MIT License (https://raw.githubusercontent.com/Dogfalo/materialize/master/LICENSE)
  */
@@ -352,6 +352,61 @@ Materialize.elementOrParentIsFixed = function(element) {
     });
     return isFixed;
 };
+
+
+/**
+ * Get time in ms
+ * @license https://raw.github.com/jashkenas/underscore/master/LICENSE
+ * @type {function}
+ * @return {number}
+ */
+var getTime = (Date.now || function () {
+  return new Date().getTime();
+});
+
+
+/**
+ * Returns a function, that, when invoked, will only be triggered at most once
+ * during a given window of time. Normally, the throttled function will run
+ * as much as it can, without ever going more than once per `wait` duration;
+ * but if you'd like to disable the execution on the leading edge, pass
+ * `{leading: false}`. To disable execution on the trailing edge, ditto.
+ * @license https://raw.github.com/jashkenas/underscore/master/LICENSE
+ * @param {function} func
+ * @param {number} wait
+ * @param {Object=} options
+ * @returns {Function}
+ */
+Materialize.throttle = function(func, wait, options) {
+  var context, args, result;
+  var timeout = null;
+  var previous = 0;
+  options || (options = {});
+  var later = function () {
+    previous = options.leading === false ? 0 : getTime();
+    timeout = null;
+    result = func.apply(context, args);
+    context = args = null;
+  };
+  return function () {
+    var now = getTime();
+    if (!previous && options.leading === false) previous = now;
+    var remaining = wait - (now - previous);
+    context = this;
+    args = arguments;
+    if (remaining <= 0) {
+      clearTimeout(timeout);
+      timeout = null;
+      previous = now;
+      result = func.apply(context, args);
+      context = args = null;
+    } else if (!timeout && options.trailing !== false) {
+      timeout = setTimeout(later, remaining);
+    }
+    return result;
+  };
+};
+
 
 // Velocity has conflicts when loaded with jQuery, this will check for it
 // First, check if in noConflict mode
@@ -1048,7 +1103,11 @@ if (jQuery) {
         }
 
         // Set css on origin
-        origin.css({position: 'absolute', 'z-index': 1000})
+        origin.css({
+          position: 'absolute',
+          'z-index': 1000,
+          'will-change': 'left, top, width, height'
+        })
         .data('width', originalWidth)
         .data('height', originalHeight);
 
@@ -1216,7 +1275,8 @@ if (jQuery) {
                 width: '',
                 'max-width': '',
                 position: '',
-                'z-index': ''
+                'z-index': '',
+                'will-change': ''
               });
 
               // Remove class
@@ -1350,6 +1410,7 @@ $(document).ready(function(){
 
       if ($active[0] !== undefined) {
         $content = $($active[0].hash);
+        $content.addClass('active');
       }
 
       // append indicator then set indicator width to tab width
@@ -1398,9 +1459,7 @@ $(document).ready(function(){
 
         // Make the old tab inactive.
         $active.removeClass('active');
-        if ($content !== undefined) {
-          $content.hide();
-        }
+        var $oldContent = $content
 
         // Update the variables with the new link and content
         $active = $(this);
@@ -1420,13 +1479,19 @@ $(document).ready(function(){
 
         if ($content !== undefined) {
           $content.show();
+          $content.addClass('active');
           if (typeof(options.onShow) === "function") {
             options.onShow.call(this, $content);
           }
         }
 
-        // Update indicator
+        if ($oldContent !== undefined) {
+          $oldContent.hide();
+          $oldContent.removeClass('active');
+        }
 
+
+        // Update indicator
         if (($index - $prev_index) >= 0) {
           $indicator.velocity({"right": calcRightPos($active) }, { duration: 300, queue: false, easing: 'easeOutQuad'});
           $indicator.velocity({"left": calcLeftPos($active) }, {duration: 300, queue: false, easing: 'easeOutQuad', delay: 90});
@@ -2650,57 +2715,6 @@ $(document).ready(function(){
 		jWindow.trigger('scrollSpy:winSize');
 	}
 
-	/**
-	 * Get time in ms
-   * @license https://raw.github.com/jashkenas/underscore/master/LICENSE
-	 * @type {function}
-	 * @return {number}
-	 */
-	var getTime = (Date.now || function () {
-		return new Date().getTime();
-	});
-
-	/**
-	 * Returns a function, that, when invoked, will only be triggered at most once
-	 * during a given window of time. Normally, the throttled function will run
-	 * as much as it can, without ever going more than once per `wait` duration;
-	 * but if you'd like to disable the execution on the leading edge, pass
-	 * `{leading: false}`. To disable execution on the trailing edge, ditto.
-	 * @license https://raw.github.com/jashkenas/underscore/master/LICENSE
-	 * @param {function} func
-	 * @param {number} wait
-	 * @param {Object=} options
-	 * @returns {Function}
-	 */
-	function throttle(func, wait, options) {
-		var context, args, result;
-		var timeout = null;
-		var previous = 0;
-		options || (options = {});
-		var later = function () {
-			previous = options.leading === false ? 0 : getTime();
-			timeout = null;
-			result = func.apply(context, args);
-			context = args = null;
-		};
-		return function () {
-			var now = getTime();
-			if (!previous && options.leading === false) previous = now;
-			var remaining = wait - (now - previous);
-			context = this;
-			args = arguments;
-			if (remaining <= 0) {
-				clearTimeout(timeout);
-				timeout = null;
-				previous = now;
-				result = func.apply(context, args);
-				context = args = null;
-			} else if (!timeout && options.trailing !== false) {
-				timeout = setTimeout(later, remaining);
-			}
-			return result;
-		};
-	};
 
 	/**
 	 * Enables ScrollSpy using a selector
@@ -2738,7 +2752,7 @@ $(document).ready(function(){
 		offset.bottom = options.offsetBottom || 0;
 		offset.left = options.offsetLeft || 0;
 
-		var throttledScroll = throttle(function() {
+		var throttledScroll = Materialize.throttle(function() {
 			onScroll(options.scrollOffset);
 		}, options.throttle || 100);
 		var readyScroll = function(){
@@ -2808,7 +2822,7 @@ $(document).ready(function(){
 		options = options || {
 			throttle: 100
 		};
-		return jWindow.on('resize', throttle(onWinSize, options.throttle || 100));
+		return jWindow.on('resize', Materialize.throttle(onWinSize, options.throttle || 100));
 	};
 
 	/**
@@ -3343,10 +3357,14 @@ $(document).ready(function(){
           if (!options.is(':visible')) {
             $(this).trigger('open', ['focus']);
             var label = $(this).val();
+            if (multiple && label.indexOf(',') >= 0) {
+              label = label.split(',')[0];
+            }
+
             var selectedOption = options.find('li').filter(function() {
               return $(this).text().toLowerCase() === label.toLowerCase();
             })[0];
-            activateOption(options, selectedOption);
+            activateOption(options, selectedOption, true);
           }
         },
         'click': function (e){
@@ -3383,13 +3401,20 @@ $(document).ready(function(){
         });
       }
 
-      // Make option as selected and scroll to selected position
-      var activateOption = function(collection, newOption) {
+      /**
+       * Make option as selected and scroll to selected position
+       * @param {jQuery} collection  Select options jQuery element
+       * @param {Element} newOption  element of the new option
+       * @param {Boolean} firstActivation  If on first activation of select
+       */
+      var activateOption = function(collection, newOption, firstActivation) {
         if (newOption) {
           collection.find('li.selected').removeClass('selected');
           var option = $(newOption);
           option.addClass('selected');
-          options.scrollTo(option);
+          if (!multiple || !!firstActivation) {
+            options.scrollTo(option);
+          }
         }
       };
 
@@ -3861,6 +3886,7 @@ $(document).ready(function(){
     data: [],
     placeholder: '',
     secondaryPlaceholder: '',
+    reversed: false,
   };
 
   $(document).ready(function() {
@@ -3907,6 +3933,7 @@ $(document).ready(function(){
         $chips.data('chips', curr_options.data);
         $chips.attr('data-index', i);
         $chips.attr('data-initialized', true);
+        $chips.attr('data-reversed', curr_options.reversed);
 
         if (!$chips.hasClass(self.SELS.CHIPS)) {
           $chips.addClass('chips');
@@ -4036,11 +4063,21 @@ $(document).ready(function(){
     };
 
     this.chips = function($chips, chipId) {
+      rev = $chips.attr('data-reversed') === "true";
+
+      var chips;
       var html = '';
-      $chips.data('chips').forEach(function(elem){
+      if (rev) {
+        html += '<input id="' + chipId +'" class="input" placeholder="">';
+        chips = $chips.data('chips').reverse();
+      } else
+        chips = $chips.data('chips');
+
+      chips.forEach(function(elem){
         html += self.renderChip(elem);
       });
-      html += '<input id="' + chipId +'" class="input" placeholder="">';
+      if (!rev)
+        html += '<input id="' + chipId +'" class="input" placeholder="">';
       $chips.html(html);
       self.setPlaceholder($chips);
 
@@ -4089,6 +4126,8 @@ $(document).ready(function(){
     };
 
     this.addChip = function(elem, $chips) {
+      rev = $chips.attr('data-reversed') === "true";
+
       if (!self.isValid($chips, elem)) {
         return;
       }
@@ -4101,14 +4140,23 @@ $(document).ready(function(){
       newData.push(elem);
 
       $chips.data('chips', newData);
-      $(chipHtml).insertBefore($chips.find('input'));
+      if (rev)
+        $(chipHtml).insertAfter($chips.find('input'));
+      else
+        $(chipHtml).insertBefore($chips.find('input'));
       $chips.trigger('chip.add', elem);
       self.setPlaceholder($chips);
     };
 
     this.deleteChip = function(chipIndex, $chips) {
+      rev = $chips.attr('data-reversed') === "true";
+
+      if (rev) {
+        absIndex = chipIndex - 1;
+        chipIndex = $chips.data('chips').length - chipIndex;
+      }
       var chip = $chips.data('chips')[chipIndex];
-      $chips.find('.chip').eq(chipIndex).remove();
+      $chips.find('.chip').eq(rev ? absIndex : chipIndex).remove();
 
       var newData = [];
       var oldData = $chips.data('chips');
@@ -4143,7 +4191,8 @@ $(document).ready(function(){
       chipsHandleEvents = true;
     }
   };
-}( jQuery ));;(function ($) {
+}( jQuery ));
+;(function ($) {
   $.fn.pushpin = function (options) {
     // Defaults
     var defaults = {
@@ -4651,49 +4700,52 @@ $(document).ready(function(){
 }( jQuery ));
 ;(function($) {
 
+  var scrollFireEventsHandled = false;
+
   // Input: Array of JSON objects {selector, offset, callback}
-
   Materialize.scrollFire = function(options) {
+    var onScroll = function() {
+      var windowScroll = window.pageYOffset + window.innerHeight;
 
-    var didScroll = false;
+      for (var i = 0 ; i < options.length; i++) {
+        // Get options from each line
+        var value = options[i];
+        var selector = value.selector,
+            offset = value.offset,
+            callback = value.callback;
 
-    window.addEventListener("scroll", function() {
-      didScroll = true;
-    });
+        var currentElement = document.querySelector(selector);
+        if ( currentElement !== null) {
+          var elementOffset = currentElement.getBoundingClientRect().top + window.pageYOffset;
 
-    // Rate limit to 100ms
-    setInterval(function() {
-      if(didScroll) {
-          didScroll = false;
-
-          var windowScroll = window.pageYOffset + window.innerHeight;
-
-          for (var i = 0 ; i < options.length; i++) {
-            // Get options from each line
-            var value = options[i];
-            var selector = value.selector,
-                offset = value.offset,
-                callback = value.callback;
-
-            var currentElement = document.querySelector(selector);
-            if ( currentElement !== null) {
-              var elementOffset = currentElement.getBoundingClientRect().top + window.pageYOffset;
-
-              if (windowScroll > (elementOffset + offset)) {
-                if (value.done !== true) {
-                  if (typeof(callback) === 'function') {
-                    callback.call(this, currentElement);
-                  } else if (typeof(callback) === 'string') {
-                    var callbackFunc = new Function(callback);
-                    callbackFunc(currentElement);
-                  }
-                  value.done = true;
-                }
+          if (windowScroll > (elementOffset + offset)) {
+            if (value.done !== true) {
+              if (typeof(callback) === 'function') {
+                callback.call(this, currentElement);
+              } else if (typeof(callback) === 'string') {
+                var callbackFunc = new Function(callback);
+                callbackFunc(currentElement);
               }
+              value.done = true;
             }
           }
+        }
       }
-    }, 100);
+    };
+
+
+    var throttledScroll = Materialize.throttle(function() {
+      onScroll();
+    }, options.throttle || 100);
+
+    if (!scrollFireEventsHandled) {
+      window.addEventListener("scroll", throttledScroll);
+      window.addEventListener("resize", throttledScroll);
+      scrollFireEventsHandled = true;
+    }
+
+    // perform a scan once, after current execution context, and after dom is ready
+    setTimeout(throttledScroll, 0);
   };
 
 })(jQuery);
@@ -7340,7 +7392,7 @@ Picker.extend( 'pickadate', DatePicker )
 
       return this.each(function() {
 
-        var images, offset, center, pressed, dim, count,
+        var images, item_width, offset, center, pressed, dim, count,
             reference, referenceY, amplitude, target, velocity,
             xform, frame, timestamp, ticker, dragged, vertical_dragged;
         var $indicators = $('<ul class="indicators"></ul>');
@@ -7396,7 +7448,9 @@ Picker.extend( 'pickadate', DatePicker )
             }
 
             // Handle clicks on indicators.
-            $indicator.click(function () {
+            $indicator.click(function (e) {
+              e.stopPropagation();
+
               var index = $(this).index();
               cycleTo(index);
             });
@@ -7711,8 +7765,16 @@ Picker.extend( 'pickadate', DatePicker )
         });
 
 
-
-        window.onresize = scroll;
+        $(window).on('resize.carousel', function() {
+          if (options.full_width) {
+            item_width = view.find('.carousel-item').first().innerWidth();
+            dim = item_width * 2 + options.padding;
+            offset = center * 2 * item_width;
+            target = offset;
+          } else {
+            scroll();
+          }
+        });
 
         setupEvents();
         scroll(offset);
@@ -7721,7 +7783,7 @@ Picker.extend( 'pickadate', DatePicker )
           if (n === undefined) {
             n = 1;
           }
-          target = offset + dim * n;
+          target = (dim * Math.round(offset / dim)) + (dim * n);
           if (offset !== target) {
             amplitude = target - offset;
             timestamp = Date.now();
@@ -7733,7 +7795,7 @@ Picker.extend( 'pickadate', DatePicker )
           if (n === undefined) {
             n = 1;
           }
-          target = offset - dim * n;
+          target = (dim * Math.round(offset / dim)) - (dim * n);
           if (offset !== target) {
             amplitude = target - offset;
             timestamp = Date.now();
